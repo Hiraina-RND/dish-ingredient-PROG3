@@ -11,7 +11,7 @@ public class DataRetriever {
         DBConnection dbConnection = new DBConnection();
         try (Connection connection = dbConnection.getConnection()) {
             PreparedStatement preparedStatement = connection.prepareStatement("""
-                    select id, reference, creation_datetime from "order" where reference like ?""");
+                    select id, reference, creation_datetime, type, statut from "order" where reference like ?""");
             preparedStatement.setString(1, reference);
             ResultSet resultSet = preparedStatement.executeQuery();
             if (resultSet.next()) {
@@ -20,6 +20,8 @@ public class DataRetriever {
                 order.setId(idOrder);
                 order.setReference(resultSet.getString("reference"));
                 order.setCreationDatetime(resultSet.getTimestamp("creation_datetime").toInstant());
+                order.setType(OrderTypeEnum.valueOf(resultSet.getString("type")));
+                order.setStatut(OrderSatutEnum.valueOf(resultSet.getString("statut")));
                 order.setDishOrderList(findDishOrderByIdOrder(idOrder));
                 return order;
             }
