@@ -49,4 +49,13 @@ public class DishOrder {
                 ", quantity=" + quantity +
                 '}';
     }
+
+    public DishOrder(Integer id, Dish dish, Integer quantity) {
+        this.id = id;
+        this.dish = dish;
+        this.quantity = quantity;
+    }
+
+    public DishOrder(){
+    }
 }

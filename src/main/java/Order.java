@@ -69,4 +69,14 @@ public class Order {
     public int hashCode() {
         return Objects.hash(id, reference, creationDatetime, dishOrderList);
     }
+
+    public Order(Integer id, String reference, Instant creationDatetime, List<DishOrder> dishOrderList) {
+        this.id = id;
+        this.reference = reference;
+        this.creationDatetime = creationDatetime;
+        this.dishOrderList = dishOrderList;
+    }
+
+    public Order(){
+    }
 }

@@ -1,4 +1,5 @@
 import java.sql.*;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -298,9 +299,51 @@ public class DataRetriever {
         }
     }
 
-//    Order saveOrder(Order orderToSave){
-//
-//    }
+    Order saveOrder(Order orderToSave){
+        String sql = """
+                INSERT INTO "order" (id, reference, creation_datetime)
+                VALUES (?, ?, ?)
+                ON CONFLICT (id) DO NOTHING
+                RETURNING reference, id
+                """;
+
+        try (Connection connection = new DBConnection().getConnection()){
+            connection.setAutoCommit(false);
+            String orderReference = null;
+            Integer idOrder = null;
+            try (PreparedStatement preparedStatement = connection.prepareStatement(sql)){
+                if (orderToSave.getId() != null){
+                    preparedStatement.setInt(1, orderToSave.getId());
+                } else {
+                    preparedStatement.setInt(1, getNextSerialValue(connection, "order", "id"));
+                }
+                preparedStatement.setString(2, orderToSave.getReference());
+                preparedStatement.setTimestamp(3 ,Timestamp.from(orderToSave.getCreationDatetime()));
+                try (ResultSet resultSet = preparedStatement.executeQuery()){
+                    if (resultSet.next()){
+                        orderReference = resultSet.getString("reference");
+                        idOrder = resultSet.getInt("id");
+                    } else {
+                        orderReference = orderToSave.getReference();
+                        idOrder = orderToSave.getId();
+                    }
+                }
+
+                List<DishOrder> newDishOrders = orderToSave.getDishOrderList();
+                if (newDishOrders == null || newDishOrders.isEmpty()){
+                    throw new RuntimeException("The dishOrderList should not be null ");
+                }
+                attachDishToOrder(connection, newDishOrders, idOrder);
+            } catch (SQLException e){
+                connection.rollback();
+                throw new RuntimeException("Error executing query", e);
+            }
+            connection.commit();
+            return findOrderByReference(orderReference);
+        } catch (SQLException e){
+            throw new RuntimeException("Error executing query", e);
+        }
+    }
 
     private void detachIngredients(Connection conn, List<DishIngredient> dishIngredients) {
         Map<Integer, List<DishIngredient>> dishIngredientsGroupByDishId = dishIngredients.stream()
@@ -334,6 +377,39 @@ public class DataRetriever {
                 ps.setInt(3, dishIngredient.getDish().getId());
                 ps.setDouble(4, dishIngredient.getQuantity());
                 ps.setObject(5, dishIngredient.getUnit());
+                ps.addBatch(); // Can be substitute ps.executeUpdate() but bad performance
+            }
+            ps.executeBatch();
+        }
+    }
+
+    private void attachDishToOrder(Connection conn, List<DishOrder> dishOrders, Integer idOrder)
+            throws SQLException {
+
+        if (dishOrders == null || dishOrders.isEmpty()) {
+            return;
+        }
+        String attachSql = """
+                    insert into dish_order (id, id_order, id_dish, quantity)
+                    values (?, ?, ?, ?)
+                    ON CONFLICT (id_order, id_dish) DO UPDATE
+                    SET quantity = EXCLUDED.quantity
+                """;
+
+        try (PreparedStatement ps = conn.prepareStatement(attachSql)) {
+            for (DishOrder dishOrder : dishOrders) {
+                if (dishOrder.getId() != null){
+                    ps.setInt(1, dishOrder.getId());
+                } else {
+                    if (getNextSerialValue(conn, "dish_order", "id") == 0){
+                        ps.setInt(1, 1);
+                    } else {
+                        ps.setInt(1, getNextSerialValue(conn, "dish_order", "id"));
+                    }
+                }
+                ps.setInt(2, idOrder);
+                ps.setInt(3, dishOrder.getDish().getId());
+                ps.setDouble(4, dishOrder.getQuantity());
                 ps.addBatch(); // Can be substitute ps.executeUpdate() but bad performance
             }
             ps.executeBatch();
