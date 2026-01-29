@@ -64,6 +64,8 @@ public class Order {
                 "id=" + id +
                 ", reference='" + reference + '\'' +
                 ", creationDatetime=" + creationDatetime +
+                ", type=" + type +
+                ", statut=" + statut +
                 ", dishOrderList=" + dishOrderList +
                 '}';
     }
