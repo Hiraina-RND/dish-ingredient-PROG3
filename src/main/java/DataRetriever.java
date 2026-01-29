@@ -1,5 +1,4 @@
 import java.sql.*;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -348,11 +347,16 @@ public class DataRetriever {
 
     Order saveOrder(Order orderToSave){
         String sql = """
-                INSERT INTO "order" (id, reference, creation_datetime, type, statut)
-                VALUES (?, ?, ?, ?::order_type, ?::order_statut)
-                ON CONFLICT (id) DO NOTHING
-                RETURNING reference, id
-                """;
+            INSERT INTO "order" (id, reference, creation_datetime, type, statut)
+            VALUES (?, ?, ?, ?::order_type, ?::order_statut)
+            ON CONFLICT (id) DO UPDATE
+            SET
+                reference = EXCLUDED.reference,
+                creation_datetime = EXCLUDED.creation_datetime,
+                type = EXCLUDED.type,
+                statut = EXCLUDED.statut
+            RETURNING reference, id;
+            """;
 
         try (Connection connection = new DBConnection().getConnection()){
             checkIngredientStock(connection, orderToSave.getDishOrderList());
@@ -360,6 +364,24 @@ public class DataRetriever {
             connection.setAutoCommit(false);
             String orderReference = null;
             Integer idOrder = null;
+
+            if (orderToSave.getId() != null){
+                String checkSql = """
+                        SELECT statut FROM "order" WHERE id = ?
+                        """;
+                try (PreparedStatement checkStmt = connection.prepareStatement(checkSql)){
+                    checkStmt.setInt(1, orderToSave.getId());
+                    try (ResultSet rs = checkStmt.executeQuery()){
+                        if (rs.next()){
+                            String currentStatut = rs.getString("statut");
+                            if ("DELIVERED".equals(currentStatut)){
+                                throw new RuntimeException("Cannot update an order that is already DELIVERED.");
+                            }
+                        }
+                    }
+                }
+            }
+
             try (PreparedStatement preparedStatement = connection.prepareStatement(sql)){
                 if (orderToSave.getId() != null){
                     preparedStatement.setInt(1, orderToSave.getId());
@@ -370,6 +392,7 @@ public class DataRetriever {
                 preparedStatement.setTimestamp(3 ,Timestamp.from(orderToSave.getCreationDatetime()));
                 preparedStatement.setString(4, orderToSave.getType().name());
                 preparedStatement.setString(5, orderToSave.getStatut().name());
+
                 try (ResultSet resultSet = preparedStatement.executeQuery()){
                     if (resultSet.next()){
                         orderReference = resultSet.getString("reference");
@@ -381,9 +404,6 @@ public class DataRetriever {
                 }
 
                 List<DishOrder> newDishOrders = orderToSave.getDishOrderList();
-                if (newDishOrders == null || newDishOrders.isEmpty()){
-                    throw new RuntimeException("The dishOrderList should not be null ");
-                }
                 attachDishToOrder(connection, newDishOrders, idOrder);
             } catch (SQLException e){
                 connection.rollback();
