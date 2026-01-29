@@ -301,15 +301,62 @@ public class DataRetriever {
         }
     }
 
+    private void checkIngredientStock(Connection conn, List<DishOrder> dishOrders)
+            throws SQLException {
+
+        String sql = """
+        SELECT initial_stock
+        FROM ingredient
+        WHERE id = ?
+    """;
+
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            for (DishOrder dishOrder : dishOrders) {
+                Dish dish = dishOrder.getDish();
+
+                for (DishIngredient di : dish.getDishIngredients()) {
+
+                    double requiredQuantity =
+                            di.getQuantity() * dishOrder.getQuantity();
+
+                    ps.setInt(1, di.getIngredient().getId());
+
+                    try (ResultSet rs = ps.executeQuery()) {
+                        if (!rs.next()) {
+                            throw new RuntimeException(
+                                    "Ingredient not found: " + di.getIngredient().getId()
+                            );
+                        }
+
+                        double stock = rs.getDouble("initial_stock");
+
+                        if (stock < requiredQuantity) {
+                            throw new RuntimeException(
+                                    "Not enough stock for ingredient "
+                                            + di.getIngredient().getName()
+                                            + " (required=" + requiredQuantity
+                                            + ", stock=" + stock + ")"
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+
     Order saveOrder(Order orderToSave){
         String sql = """
-                INSERT INTO "order" (id, reference, creation_datetime)
-                VALUES (?, ?, ?)
+                INSERT INTO "order" (id, reference, creation_datetime, type, statut)
+                VALUES (?, ?, ?, ?::order_type, ?::order_statut)
                 ON CONFLICT (id) DO NOTHING
                 RETURNING reference, id
                 """;
 
         try (Connection connection = new DBConnection().getConnection()){
+            checkIngredientStock(connection, orderToSave.getDishOrderList());
+
             connection.setAutoCommit(false);
             String orderReference = null;
             Integer idOrder = null;
@@ -321,6 +368,8 @@ public class DataRetriever {
                 }
                 preparedStatement.setString(2, orderToSave.getReference());
                 preparedStatement.setTimestamp(3 ,Timestamp.from(orderToSave.getCreationDatetime()));
+                preparedStatement.setString(4, orderToSave.getType().name());
+                preparedStatement.setString(5, orderToSave.getStatut().name());
                 try (ResultSet resultSet = preparedStatement.executeQuery()){
                     if (resultSet.next()){
                         orderReference = resultSet.getString("reference");
