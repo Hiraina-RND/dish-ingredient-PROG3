@@ -80,3 +80,8 @@ create table if not exists dish_order
 
 ALTER TABLE dish_order
 ADD CONSTRAINT uq_order_dish UNIQUE (id_order, id_dish);
+
+create type order_type as enum ('EAT_IN', 'TAKE_AWAY');
+
+ALTER TABLE "order"
+ADD COLUMN if not exists type order_type;
