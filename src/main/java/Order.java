@@ -6,6 +6,8 @@ public class Order {
     private Integer id;
     private String reference;
     private Instant creationDatetime;
+    private OrderTypeEnum type;
+    private OrderSatutEnum statut;
     private List<DishOrder> dishOrderList;
 
     public Integer getId() {
@@ -34,6 +36,22 @@ public class Order {
 
     public List<DishOrder> getDishOrderList() {
         return dishOrderList;
+    }
+
+    public void setType(OrderTypeEnum type) {
+        this.type = type;
+    }
+
+    public void setStatut(OrderSatutEnum statut) {
+        this.statut = statut;
+    }
+
+    public OrderTypeEnum getType() {
+        return type;
+    }
+
+    public OrderSatutEnum getStatut() {
+        return statut;
     }
 
     public void setDishOrderList(List<DishOrder> dishOrderList) {
@@ -70,10 +88,12 @@ public class Order {
         return Objects.hash(id, reference, creationDatetime, dishOrderList);
     }
 
-    public Order(Integer id, String reference, Instant creationDatetime, List<DishOrder> dishOrderList) {
+    public Order(Integer id, String reference, Instant creationDatetime, OrderTypeEnum type, OrderSatutEnum statut, List<DishOrder> dishOrderList) {
         this.id = id;
         this.reference = reference;
         this.creationDatetime = creationDatetime;
+        this.type = type;
+        this.statut = statut;
         this.dishOrderList = dishOrderList;
     }
 
