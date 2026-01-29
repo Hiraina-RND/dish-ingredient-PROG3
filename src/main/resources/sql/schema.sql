@@ -85,3 +85,8 @@ create type order_type as enum ('EAT_IN', 'TAKE_AWAY');
 
 ALTER TABLE "order"
 ADD COLUMN if not exists type order_type;
+
+create type order_statut as enum ('CREATED', 'READY', 'DELIVERED');
+
+ALTER TABLE "order"
+ADD COLUMN if not exists statut order_statut;
